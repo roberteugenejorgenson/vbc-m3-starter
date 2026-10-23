@@ -1,43 +1,16 @@
-import { readFile } from "node:fs/promises";
-import path from "node:path";
 import { NextResponse } from "next/server";
+import { getEntries } from "../../../lib/supabase.js";
 
-function parseCsv(csv) {
-  const rows = [];
-  let row = [];
-  let field = "";
-  let quoted = false;
-
-  for (let index = 0; index < csv.length; index += 1) {
-    const character = csv[index];
-
-    if (character === '"') {
-      if (quoted && csv[index + 1] === '"') {
-        field += '"';
-        index += 1;
-      } else {
-        quoted = !quoted;
-      }
-    } else if (character === "," && !quoted) {
-      row.push(field);
-      field = "";
-    } else if ((character === "\n" || character === "\r") && !quoted) {
-      if (character === "\r" && csv[index + 1] === "\n") index += 1;
-      row.push(field);
-      rows.push(row);
-      row = [];
-      field = "";
-    } else {
-      field += character;
-    }
-  }
-
-  if (field || row.length) {
-    row.push(field);
-    rows.push(row);
-  }
-  return rows;
-}
+const EXPORT_FIELDS = [
+  "id",
+  "created_at",
+  "requester_name",
+  "location",
+  "description",
+  "priority",
+  "status",
+  "completed_at",
+];
 
 function toCsvField(value) {
   const text = String(value ?? "");
@@ -46,22 +19,14 @@ function toCsvField(value) {
 
 export async function GET() {
   try {
-    const csvPath = path.join(process.cwd(), "data", "seed-requests.csv");
-    const rows = parseCsv(await readFile(csvPath, "utf8"));
-    const sourceHeaders = rows.shift() ?? [];
-    const dataRows = rows.filter((row) => row.some((field) => field.trim()));
-    const requests = dataRows.map((values, index) => ({
-      id: index + 1,
-      ...Object.fromEntries(
-        sourceHeaders.map((header, fieldIndex) => [header, values[fieldIndex] ?? ""]),
-      ),
-    }));
-    requests.sort(
+    const entries = await getEntries();
+    entries.sort(
       (left, right) => Date.parse(right.created_at) - Date.parse(left.created_at),
     );
-
-    const headers = ["id", ...sourceHeaders];
-    const output = [headers, ...requests.map((request) => headers.map((header) => request[header]))]
+    const output = [
+      EXPORT_FIELDS,
+      ...entries.map((entry) => EXPORT_FIELDS.map((field) => entry[field])),
+    ]
       .map((row) => row.map(toCsvField).join(","))
       .join("\r\n");
 
