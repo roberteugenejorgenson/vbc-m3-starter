@@ -236,10 +236,68 @@ button[type="submit"]:disabled {
   color: var(--muted);
 }
 
+.requests-table th:nth-child(6),
+.requests-table td:nth-child(6) {
+  min-width: 130px;
+  white-space: nowrap;
+}
+
 .requests-table select {
   width: auto;
   padding: 5px 8px;
   font-size: 14px;
+}
+
+.requests-table input[type="text"],
+.requests-table textarea,
+.requests-table select {
+  min-width: 110px;
+  max-width: 220px;
+  font-size: 13px;
+}
+
+.requests-table textarea {
+  min-width: 180px;
+  resize: vertical;
+}
+
+.row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.row-action {
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--accent-dark);
+  background: var(--surface);
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  padding: 5px 9px;
+  cursor: pointer;
+}
+
+.row-action:hover:not(:disabled) {
+  color: #ffffff;
+  background: var(--accent);
+}
+
+.row-action:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.row-action-save {
+  color: #ffffff;
+  background: var(--accent);
+}
+
+.request-list-footer {
+  display: flex;
+  justify-content: center;
+  margin-top: 16px;
 }
 
 .badge {
@@ -248,11 +306,27 @@ button[type="submit"]:disabled {
   border-radius: 10px;
   font-size: 12px;
   font-weight: 600;
+  white-space: nowrap;
 }
 
 .badge-urgent {
   background: #fbe3e1;
   color: #a12a1c;
+}
+
+.badge-status-new {
+  background: #e6f0fb;
+  color: #285d8f;
+}
+
+.badge-status-in-progress {
+  background: #fdeed8;
+  color: #94550c;
+}
+
+.badge-status-complete {
+  background: #e4f3e9;
+  color: #1f6b45;
 }
 
 .badge-high {

@@ -42,6 +42,10 @@ export default function HomePage() {
   const [message, setMessage] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [tableError, setTableError] = useState("");
+  const [editingId, setEditingId] = useState(null);
+  const [editForm, setEditForm] = useState(null);
+  const [savingId, setSavingId] = useState(null);
+  const [showAllRequests, setShowAllRequests] = useState(false);
 
   async function loadSummary() {
     try {
@@ -113,25 +117,48 @@ export default function HomePage() {
     }
   }
 
-  async function handleStatusChange(id, status) {
+  function beginEdit(request) {
+    setEditingId(request.id);
+    setEditForm({
+      requester_name: request.requester_name,
+      location: request.location,
+      description: request.description,
+      priority: request.priority,
+      status: request.status,
+    });
+    setTableError("");
+  }
+
+  function handleEditChange(event) {
+    const { name, value } = event.target;
+    setEditForm((current) => ({ ...current, [name]: value }));
+  }
+
+  async function saveEditedRequest(id) {
+    setSavingId(id);
     setTableError("");
 
     try {
       const response = await fetch("/api/requests/" + id, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status }),
+        body: JSON.stringify(editForm),
       });
+      const data = await response.json();
 
       if (!response.ok) {
-        const data = await response.json();
-        setTableError(data.error || "Could not update that status.");
+        setTableError(data.error || "Could not save that request.");
+        return;
       }
+
+      setEditingId(null);
+      setEditForm(null);
+      await Promise.all([loadRequests(), loadSummary()]);
     } catch (error) {
       setTableError("Could not reach the server. Please try again.");
+    } finally {
+      setSavingId(null);
     }
-
-    await Promise.all([loadRequests(), loadSummary()]);
   }
 
   function tileValue(key) {
@@ -140,6 +167,10 @@ export default function HomePage() {
     }
     return summary[key];
   }
+
+  const visibleRequests = showAllRequests
+    ? requests
+    : requests.filter((request) => request.status !== "Complete");
 
   return (
     <main className="page">
@@ -240,15 +271,23 @@ export default function HomePage() {
       <section className="card">
         <div className="table-header">
           <h2>Requests</h2>
-          <a className="export-link" href="/api/export">
+          <a
+            className="export-link"
+            href="/api/export"
+            download="morrowlane-requests.csv"
+          >
             Export CSV
           </a>
         </div>
 
         {tableError ? <p className="table-error">{tableError}</p> : null}
 
-        {requests.length === 0 ? (
-          <p className="empty-state">No requests to show yet.</p>
+        {visibleRequests.length === 0 ? (
+          <p className="empty-state">
+            {requests.length === 0
+              ? "No requests to show yet."
+              : "No open requests to show."}
+          </p>
         ) : (
           <table className="requests-table">
             <thead>
@@ -259,43 +298,121 @@ export default function HomePage() {
                 <th>Description</th>
                 <th>Priority</th>
                 <th>Status</th>
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody>
-              {requests.map((request) => (
+              {visibleRequests.map((request) => (
                 <tr key={request.id}>
                   <td>{formatDate(request.created_at)}</td>
-                  <td>{request.requester_name}</td>
-                  <td>{request.location}</td>
-                  <td>{truncate(request.description)}</td>
+                  {editingId === request.id ? (
+                    <>
+                      <td>
+                        <input
+                          type="text"
+                          name="requester_name"
+                          aria-label="Requester name"
+                          value={editForm.requester_name}
+                          onChange={handleEditChange}
+                        />
+                      </td>
+                      <td>
+                        <select name="location" aria-label="Location" value={editForm.location} onChange={handleEditChange}>
+                          {LOCATIONS.map((location) => <option key={location} value={location}>{location}</option>)}
+                        </select>
+                      </td>
+                      <td>
+                        <textarea
+                          name="description"
+                          aria-label="Description"
+                          rows={2}
+                          maxLength={500}
+                          value={editForm.description}
+                          onChange={handleEditChange}
+                        />
+                      </td>
+                      <td>
+                        <select name="priority" aria-label="Priority" value={editForm.priority} onChange={handleEditChange}>
+                          {PRIORITIES.map((priority) => <option key={priority} value={priority}>{priority}</option>)}
+                        </select>
+                      </td>
+                      <td>
+                        <select name="status" aria-label="Status" value={editForm.status} onChange={handleEditChange}>
+                          {STATUSES.map((status) => <option key={status} value={status}>{status}</option>)}
+                        </select>
+                      </td>
+                    </>
+                  ) : (
+                    <>
+                      <td>{request.requester_name}</td>
+                      <td>{request.location}</td>
+                      <td>{truncate(request.description)}</td>
+                      <td>
+                        <span
+                          className={
+                            "badge badge-" + String(request.priority).toLowerCase()
+                          }
+                        >
+                          {request.priority}
+                        </span>
+                      </td>
+                      <td>
+                        <span
+                          className={
+                            "badge badge-status badge-status-" +
+                            request.status.toLowerCase().replaceAll(" ", "-")
+                          }
+                        >
+                          {request.status}
+                        </span>
+                      </td>
+                    </>
+                  )}
                   <td>
-                    <span
-                      className={
-                        "badge badge-" + String(request.priority).toLowerCase()
-                      }
-                    >
-                      {request.priority}
-                    </span>
-                  </td>
-                  <td>
-                    <select
-                      value={request.status}
-                      onChange={(event) =>
-                        handleStatusChange(request.id, event.target.value)
-                      }
-                    >
-                      {STATUSES.map((status) => (
-                        <option key={status} value={status}>
-                          {status}
-                        </option>
-                      ))}
-                    </select>
+                    {editingId === request.id ? (
+                      <div className="row-actions">
+                        <button
+                          type="button"
+                          className="row-action row-action-save"
+                          disabled={savingId === request.id}
+                          onClick={() => saveEditedRequest(request.id)}
+                        >
+                          {savingId === request.id ? "Saving…" : "Save"}
+                        </button>
+                        <button
+                          type="button"
+                          className="row-action"
+                          disabled={savingId === request.id}
+                          onClick={() => { setEditingId(null); setEditForm(null); }}
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        className="row-action"
+                        onClick={() => beginEdit(request)}
+                        disabled={editingId !== null}
+                      >
+                        Edit
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
         )}
+        <div className="request-list-footer">
+          <button
+            type="button"
+            className="row-action"
+            onClick={() => setShowAllRequests((showingAll) => !showingAll)}
+          >
+            {showAllRequests ? "Show open requests only" : "Show all records"}
+          </button>
+        </div>
       </section>
     </main>
   );
